@@ -31,14 +31,11 @@
     <target name="compile" depends="init">
         <echo message="Compiling Source files from ${basedir}/${src.dir}"/>
         <javac srcdir="${src.dir}/" includes="**/*.java" excludes="" destdir="${classes.dir}/${ant.project.name}" fork="true" deprecation="false" debug="true" memoryMaximumSize="512m" nowarn="true" target="${java.target.vm}">
-            <!--<classpath>
+	    <classpath>
                 <fileset dir="${lib.dir}">
                     <include name="**/*.jar"/>
                 </fileset>
-                <fileset dir="${jar.dir}">
-                    <include name="**/*.jar"/>
-                </fileset>
-            </classpath>-->
+            </classpath>
         </javac>
     </target>
     <target name="init" depends="">

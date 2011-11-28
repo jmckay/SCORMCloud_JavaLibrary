@@ -44,7 +44,7 @@ public class RegistrationService
     private Configuration configuration = null;
     private ScormEngineService manager = null;
 
-    /// <summary>
+    /// <summary> 
     /// Main constructor that provides necessary configuration information
     /// </summary>
     /// <param name="configuration">Application Configuration Data</param>
