@@ -36,7 +36,7 @@ public class RegistrationSummary
     private String _success;
     private String _totaltime;
     private String _score;
-
+   
     public RegistrationSummary(Element reportElem)
     {
         this._complete = reportElem.getElementsByTagName("complete").item(0).getTextContent();
