@@ -272,7 +272,9 @@ public class ServiceRequest {
         
         //Cut off trailing ampersand
         paramStr.deleteCharAt(paramStr.length() - 1);
-        return engineServiceUrl + "/api?" + paramStr.toString();
+//        return engineServiceUrl + "/api?" + paramStr.toString();
+        // See how far we get with relative urls in fasttrack
+        return "/api?" + paramStr.toString();
     }
 	
 	protected void raiseServiceExceptionIfPresent(Document xmlResponse) throws ServiceException {
