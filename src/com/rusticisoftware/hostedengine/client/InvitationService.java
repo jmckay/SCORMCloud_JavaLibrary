@@ -34,11 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeoutException;
 
-import javax.mail.Message.RecipientType;
-import javax.mail.MessagingException;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
-
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -64,27 +59,49 @@ public class InvitationService
         this.configuration = configuration;
     }
     
-	public String createInvitation(String courseId, 
-		boolean publicInvitation, Integer registrationCap, String addressess,MailMessageTemplate messageTemplate,
-		RegistrationResultsPostback resultsPostback, Map<String, String> extendedParameters) throws Exception  {
+	public String createInvitation(String courseId, boolean publicInvitation, boolean send, 
+			String addresses, String emailSubject, String emailBody, String creatingUserEmail, Integer registrationCap,
+			String postbackUrl, String authType, String urlName, String urlPass, String resultsFormat, 
+			boolean async, Map<String, String> extendedParameters) throws Exception  {
 		
         ServiceRequest request = new ServiceRequest(configuration);
         request.setUsePost(true);
         
-        request.getParameters().add("public", publicInvitation);
         request.getParameters().add("courseid", courseId);
+        request.getParameters().add("public", publicInvitation);
+        
+        request.getParameters().add("send", send);
+        
         if (registrationCap != null && registrationCap > 0) {
         	request.getParameters().add("registrationCap", registrationCap);
         }
-        
-
-        if (resultsPostback != null) {
-            request.getParameters().add("resultsPostback", gson.toJson(resultsPostback));
+        if (addresses != null) {
+            request.getParameters().add("addresses", addresses);
         }
-       
-        request.getParameters().add("addressess", addressess);
-        if (messageTemplate != null) {
-        	request.getParameters().add("messageTemplate", gson.toJson(messageTemplate));
+        if (emailSubject != null) {
+            request.getParameters().add("emailSubject", emailSubject);
+        }
+        if (emailBody != null) {
+            request.getParameters().add("emailBody", emailBody);
+        }
+        if (creatingUserEmail != null) {
+            request.getParameters().add("creatingUserEmail", creatingUserEmail);
+        }
+        
+        if (postbackUrl != null) {
+            request.getParameters().add("postbackUrl", postbackUrl);
+        }
+        if (authType != null) {
+            request.getParameters().add("authType", authType);
+        }
+        if (urlName != null) {
+            request.getParameters().add("urlName", urlName);
+        }
+        if (urlPass != null) {
+            request.getParameters().add("urlPass", urlPass);
+        }
+        if (resultsFormat != null) {
+            request.getParameters().add("resultsFormat", resultsFormat);
         }
         
         if (extendedParameters != null) {
@@ -92,7 +109,11 @@ public class InvitationService
         		request.getParameters().add(entry.getKey(), entry.getValue());
         	}
         }
-        return Utils.getNonXmlPayloadFromResponse(request.callService("rustici.invitation.createInvitation"));
+        if (async){
+        	return Utils.getNonXmlPayloadFromResponse(request.callService("rustici.invitation.createInvitationAsync"));
+        } else {
+        	return Utils.getNonXmlPayloadFromResponse(request.callService("rustici.invitation.createInvitation"));
+        }
 	}
 	
 	public InvitationInfo getInvitationInfo(String invitationId, boolean includeRegistrationSummary) throws Exception {
@@ -140,113 +161,9 @@ public class InvitationService
 		return userInvitationStatuses; 
 	}
 
-    /// <summary>
-    /// creates and sends an invitation. 
-	/// NOTE: synchronous, blocks up to timeoutSeconds waiting for invitation to be created, and then the time it takes to send invitations.
-    /// </summary>
-  	public String createAndSendInvitation(String courseId, 
-			boolean publicInvitation, Integer registrationCap, String addressess,MailMessageTemplate messageTemplate,
-			RegistrationResultsPostback resultsPostback, Map<String, String> extendedParameters,
-			SMTPHelper mailer, int timeoutSeconds)  throws Exception{
-
-  			Calendar endBy = Calendar.getInstance();
-  			endBy.add(Calendar.SECOND, timeoutSeconds);
-  			int trys = 1;
-  			System.out.println("initial timeout ms: " + Calendar.getInstance().compareTo(endBy));
-  			// first, create the invitation
-			String invitationId = createInvitation(courseId, publicInvitation, registrationCap, addressess, messageTemplate,
-					resultsPostback, extendedParameters);
-			InvitationInfo invitationInfo = null;
-			
-			// wait for invitation (and associated registrations if applicable) to be created.
-			while ((invitationInfo == null || !invitationInfo.is_created()) && Calendar.getInstance().compareTo(endBy) < 0) {
-				int sleepMs = (int) Math.min(trys++ * 2000, endBy.getTime().getTime() - new Date().getTime());
-				if (sleepMs > 0) {
-					Thread.sleep(sleepMs);
-				}
-				
-				invitationInfo = getInvitationInfo(invitationId, false);
-				if (invitationInfo != null) {
-					validateInvitationInfo(invitationInfo);
-				}
-			}
-			
-			if (invitationInfo == null || !invitationInfo.is_created()) {
-				throw new TimeoutException();
-			}
-		
-		sendInvitation(invitationInfo, messageTemplate.getFromAddress(), mailer);
-		
-		return invitationId;
-	}
-
-  	public void sendInvitation(String invitationId, String from, SMTPHelper mailer) throws Exception {
-  		InvitationInfo info = getInvitationInfo(invitationId, false);
-  		validateInvitationInfo(info);
-  		sendInvitation(info, from, mailer);
-  	}
-  	
-  	private void validateInvitationInfo(InvitationInfo info) throws Exception {
-		if (info.get_errors() != null && info.get_errors().length > 0) {
-			StringBuilder errorString = new StringBuilder();
-			errorString.append("There were errors creating the invitation: \n");
-			for (String error : info.get_errors()) {
-				errorString.append(error + "\n");
-			}
-			throw new Exception(errorString.toString());
-		}
-  	}
-  	
-  	private void sendInvitation(InvitationInfo invitationInfo, String from, SMTPHelper mailer) throws Exception {
-		validateInvitationInfo(invitationInfo);
-		
-		MailMessageTemplate invitationMessage = new MailMessageTemplate();
-		invitationMessage.setBody(invitationInfo.get_message());
-		invitationMessage.setFromAddress(from);
-		invitationMessage.setSubject(invitationInfo.get_subject());
-		
-		if (invitationInfo.is_Public()){
-			throw new Exception("Not implemented");
-		}
-		else {
-			// send invitation mails now that invitation (& registrations) have been created.
-			for (UserInvitationStatus userInvitation : invitationInfo.get_userInvitations()) {
-				InternetAddress toAddress = new InternetAddress(userInvitation.get_email());
-				mailer.Send(buildMessage(mailer, invitationMessage, toAddress, userInvitation.get_url()));
-			}
-			
-			if (invitationInfo.get_userInvitations().length == 0) {
-				throw new Exception("Nothing to send!");
-			}
-		}
-  	}
+    
   	
   	
-  	private String replaceTokens(String source, InternetAddress userAddress, String url) {
-  		String result;
-  		if (source == null || source.equals("")) {
-  			return "";
-  		}
-  		String name;
-  		name = userAddress.getPersonal();
-  		if (name == null || name.equals("")) {
-  			name = userAddress.getAddress();
-  		}
-  		
-  		result = source.replace("[USER]", name);
-  		result = result.replace("[URL]",url);
-  		result = result.replaceAll("\\[URL:(.*)\\]", "<a href='" + url + "'>$1</a>");
-  		
-  		return result;
-   	}
   	
-  	// NOTE: name portion of toAddress is used for [USER] replacement, so the caller should make sure it is set
-  	private MimeMessage buildMessage(SMTPHelper mailer, MailMessageTemplate template, InternetAddress toAddress, String url) throws MessagingException {
-  		MimeMessage msg = new MimeMessage(mailer.getSession());
-  		msg.setFrom(new InternetAddress(template.getFromAddress()));
-  		msg.addRecipient(RecipientType.TO, toAddress);
-  		msg.setContent(replaceTokens(template.getBody(), toAddress, url), "text/html");
-  		msg.setSubject(replaceTokens(template.getSubject(), toAddress, url));
-  		return msg;
-  	}
+  	
 }
