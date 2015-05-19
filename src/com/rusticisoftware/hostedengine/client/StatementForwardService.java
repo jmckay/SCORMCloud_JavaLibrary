@@ -57,8 +57,15 @@ public class StatementForwardService {
 		request.getParameters().add("destinationURL", dURL);
 		request.getParameters().add("destinationUsername", dUsername);
 		request.getParameters().add("destinationPassword", dPassword);
-		return request.getStringFromService("rustici.statementForward.AddForwardingPath");
+		return request.getStringFromService("rustici.statementForward.addForwardingPath");
 	}
+	
+    public Document ListPaths() throws Exception {
+        ServiceRequest request = new ServiceRequest(configuration);
+    
+        Document response = request.callService("rustici.statementForward.listForwardingPaths");
+        return response;
+    }
 
 	public void UpdatePath(String id, String sURL, String sUsername, String sPassword, String dURL, 
 		String dUsername, String dPassword) throws Exception {
@@ -72,13 +79,13 @@ public class StatementForwardService {
 		request.getParameters().add("destinationUsername", dUsername);
 		request.getParameters().add("destinationPassword", dPassword);
 
-	    Document response = request.callService("rustici.statementForward.UpdateForwardingPath");
+	    Document response = request.callService("rustici.statementForward.updateForwardingPath");
 	}
 
 	public void DeletePath(String id) throws Exception {
 		ServiceRequest request = new ServiceRequest(configuration);
 		request.getParameters().add("id", id);
 
-	    Document response = request.callService("rustici.statementForward.DeleteForwardingPath");
+	    Document response = request.callService("rustici.statementForward.deleteForwardingPath");
 	}
 }
